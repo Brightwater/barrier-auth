@@ -30,7 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# to run the app  uvicorn main:app --reload --port 4304 --host 0.0.0.0
+# to run the app  uvicorn main:app --reload --port 4344 --host 0.0.0.0
 def getPasswordHash(password):
     return pwd_context.hash(password)
 
