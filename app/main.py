@@ -153,4 +153,33 @@ async def get_current_user(token):
     if user is None:
         raise credentials_exception
     
-    return user
+    return user[0]
+
+@app.post("/verifyTokenAndScope")
+async def get_current_user_and_scope(token: str, scope: str):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("username")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    
+    user = await database.fetch_all(f"select username, password, scopes from authenticated_user where username = '{token_data.username}'")
+    if user is None:
+        raise credentials_exception
+    
+    user = user[0]
+    
+    for s in user['scopes']:
+        if s == scope:
+            return user[0]
+    
+    raise credentials_exception
