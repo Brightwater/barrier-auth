@@ -1,6 +1,7 @@
 databases==0.7.0
 fastapi==0.94.0
-jose==1.0.0
+#jose==1.0.0
+PyJwt
 passlib==1.7.4
 pydantic==1.10.5
 python_jose==3.3.0

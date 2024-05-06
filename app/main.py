@@ -2,14 +2,14 @@
 from datetime import timedelta, datetime, timezone
 import secrets
 import string
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 import uvicorn
 from model.pydantics import *
 from utility.database import database
 from passlib.context import CryptContext
 from fastapi.concurrency import run_in_threadpool
 import json
-from jose import JWTError, jwt
+import jwt
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -44,6 +44,8 @@ def createJwt(data: dict, expires_delta: timedelta | None = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
+    # encode the jwt using pyjwt
+    # encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -105,6 +107,26 @@ async def login3(user: User):
     insert = f"insert into authenticated_user values(:username, :password)"
     return await database.execute(insert, values=userVal)
 
+@app.post("/createUser/Recipe")
+async def login4(request: Request, user: User):
+    # get the origin of the request
+    domain = request.headers.get('Origin')
+    print(domain)
+    
+    if (domain != 'https://courtmew.recipe.bright-waters.com'):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This request domain is not allowed for the scope",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) 
+    
+    hashedPassword = await run_in_threadpool(lambda: getPasswordHash(user.password))
+    
+    # test scope is for recipes
+    userVal = {"username": user.username, "password": hashedPassword, "scopes": ["test"]}
+    insert = f"insert into authenticated_user values(:username, :password, :scopes)"
+    return await database.execute(insert, values=userVal)
+
 @app.post("/login/token")
 async def loginToken(user: User, tokenIndex: int):
     # dUser = await database.fetch_all(f"select username, encrypted_refresh_token as refresh, extract(epoch from refresh_token_expiration) as exp, scopes from authenticated_user where username = '{user.username}'")
@@ -146,7 +168,7 @@ async def get_current_user(token):
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-    except JWTError:
+    except Exception:
         raise credentials_exception
     
     user = await database.fetch_all(f"select username, password from authenticated_user where username = '{token_data.username}'")
@@ -169,7 +191,7 @@ async def get_current_user_and_scope(token: str, scope: str):
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-    except JWTError:
+    except Exception:
         raise credentials_exception
     
     user = await database.fetch_all(f"select username, password, scopes from authenticated_user where username = '{token_data.username}'")
